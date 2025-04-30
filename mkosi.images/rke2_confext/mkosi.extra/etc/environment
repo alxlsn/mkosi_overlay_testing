@@ -1,0 +1,2 @@
+KUBECONFIG="/var/lib/rancher/rke2/rke2.yaml"
+NODE_TYPE="server"

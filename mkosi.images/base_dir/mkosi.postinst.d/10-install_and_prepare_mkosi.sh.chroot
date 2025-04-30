@@ -1,0 +1,9 @@
+#!/bin/bash
+
+INSTALL_RKE2_ARTIFACT_PATH=/opt/bin/rke2-artifacts INSTALL_RKE2_SKIP_RELOAD=true INSTALL_RKE2_AGENT_IMAGES_DIR=/etc/init/rancher/rke2/agent/images /opt/bin/install.sh
+
+rm -rf /opt/bin/rke2-artifacts
+
+rm -rf /opt/bin/install.sh
+
+PRODUCT=rke2 DATA_DIR=/etc/init/rancher/rke2 /etc/init/rancher/rke2/generate-custom-certificate.sh

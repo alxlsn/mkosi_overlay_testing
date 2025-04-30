@@ -1,0 +1,5 @@
+{{ template "base" . }}
+
+[plugins."io.containerd.grpc.v1.cri".cni]
+  bin_dir = "/var/cni/bin"
+  conf_dir = "/var/cni/net.d"

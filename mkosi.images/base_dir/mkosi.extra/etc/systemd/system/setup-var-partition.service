@@ -1,0 +1,16 @@
+[Unit]
+Description=hauler service
+ConditionPathExists=!/var/.init.done
+After=systemd-confext.service
+Requires=systemd-confext.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+WorkingDirectory=/etc/init
+ExecStart=/bin/bash -c "rm -rf /var/lib/rancher/*"
+ExecStart=/bin/bash -c "mkdir -p /var/lib/rancher"
+ExecStart=/bin/bash -c "cp -rf /etc/init/rancher/* /var/lib/rancher/"
+ExecStartPost=/bin/touch /var/.init.done
+[Install]
+WantedBy=multi-user.target

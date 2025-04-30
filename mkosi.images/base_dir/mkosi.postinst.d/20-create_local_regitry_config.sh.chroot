@@ -1,0 +1,45 @@
+#!/bin/bash
+
+create_local_only_registry_file() {
+    LOCAL_REGISTRY_PORT=${LOCAL_REGISTRY_PORT:-30005}
+    HAULER_REGISTRY_PORT=${HAULER_REGISTRY_PORT:-5000}
+    MAIN_ETC_DIR=/etc/rancher/rke2
+    $SUDO mkdir -p ${MAIN_ETC_DIR}
+    $SUDO tee ${MAIN_ETC_DIR}/registries.yaml >/dev/null << EOF
+mirrors:
+  docker.io:
+    endpoint:
+      - "http://localhost:${LOCAL_REGISTRY_PORT}"
+      - "http://localhost:${HAULER_REGISTRY_PORT}"
+  index.docker.io:
+    endpoint:
+      - "http://localhost:${LOCAL_REGISTRY_PORT}"
+      - "http://localhost:${HAULER_REGISTRY_PORT}"
+  ghcr.io:
+    endpoint:
+      - "http://localhost:${LOCAL_REGISTRY_PORT}"
+      - "http://localhost:${HAULER_REGISTRY_PORT}"
+  quay.io:
+    endpoint:
+      - "http://localhost:${LOCAL_REGISTRY_PORT}"
+      - "http://localhost:${HAULER_REGISTRY_PORT}"
+  k8s.gcr.io:
+    endpoint:
+      - "http://localhost:${LOCAL_REGISTRY_PORT}"
+      - "http://localhost:${HAULER_REGISTRY_PORT}"
+  cr.fluentbit.io:
+    endpoint:
+      - "http://localhost:${LOCAL_REGISTRY_PORT}"
+      - "http://localhost:${HAULER_REGISTRY_PORT}"
+  registry.k8s.io:
+    endpoint:
+      - "http://localhost:${LOCAL_REGISTRY_PORT}"
+      - "http://localhost:${HAULER_REGISTRY_PORT}"
+EOF
+
+    $SUDO chmod 600 ${MAIN_ETC_DIR}/registries.yaml
+}
+
+create_local_only_registry_file
+
+systemctl mask systemd-networkd-wait-online

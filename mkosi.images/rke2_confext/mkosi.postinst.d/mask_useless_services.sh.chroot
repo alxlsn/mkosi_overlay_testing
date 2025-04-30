@@ -1,0 +1,33 @@
+#!/bin/bash
+
+
+NODE_TYPE="server"
+
+systemd_enable_and_start() {
+    case ${NODE_TYPE} in
+    *server)
+        systemd_enable_server_service
+        ;;
+    *agent)
+        systemd_enable_agent_service
+        ;;
+    esac
+}
+
+systemd_enable_server_service() {
+    systemctl enable rke2-server.service
+    systemctl mask rke2-agent.service
+}
+
+systemd_enable_agent_service() {
+    systemctl enable rke2-agent.service
+    systemctl mask rke2-server.service
+}
+
+
+systemd_enable_and_start
+
+systemctl mask systemd-networkd-wait-online
+
+# Redirect rke node folder into a writable folder
+ln -s /var/lib/rancher/rke2/node /etc/rancher/node

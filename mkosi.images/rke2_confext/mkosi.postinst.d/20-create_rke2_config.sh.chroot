@@ -1,0 +1,307 @@
+#!/bin/bash
+
+
+comma_lst_to_yaml_lst() {
+    lst_in=$1
+    indentation=$2
+    character=${3:-,}
+
+    arr_in=$(echo $lst_in | tr "${character}" "\n")
+    for i in $arr_in; do
+        printf "%*s%s\n" $indentation '' "- $i"
+    done
+}
+
+comma_lst_to_yaml_dict() {
+    lst_in=$1
+    indentation=$2
+    character=${3:-,}
+
+    first_elemt=$(echo $lst_in | cut -d "${character}" -f1)
+    lst_in=$(echo $lst_in | sed -e 's/ *, */,/g' | cut -d "${character}" -f2-)
+
+    printf "%*s%s\n" $indentation '' "- $first_elemt"
+
+    OLD_IFS=$IFS
+    IFS=","
+    for i in $lst_in; do
+        printf "%*s%s\n" $((indentation+2)) '' "$i"
+    done
+    IFS=$OLD_IFS
+}
+
+concat_lst() {
+    for msg in "$@"; do
+        if [ -n "${msg}" ]; then
+          echo "$msg"
+        fi
+    done
+}
+
+join_elements_with_quotes() {
+    elements_list=${1}
+    join_character=${2:-, }
+
+    OLD_IFS=$IFS
+    IFS=" "
+    for resource in $elements_list; do
+        RESOURCES="${RESOURCES:+${RESOURCES}${join_character}}\"$resource\""
+    done
+    echo "${RESOURCES}"
+    IFS=$OLD_IFS
+}
+
+list_vars_starting_with() {
+  leading_pattern=$1
+  printenv | sed -n "s/^\(${leading_pattern}.*\)=.*/\1/p"
+}
+
+transform_vars_to_args() {
+  leading_pattern=$1
+  for i in $(printenv | sed -n "s/^\(${leading_pattern}.*\)=.*/\1/p"); do
+    arg="$(echo $i | sed -e "s/${leading_pattern}//g" | tr '[:upper:]' '[:lower:]' | sed -e 's/_/-/g' )=$(eval echo \$$(echo $i))"
+    arg_list="${arg_list:+${arg_list};}\"${arg}\""
+  done
+
+  echo $arg_list
+}
+
+
+setup_env() {
+    
+    DOWNLOADER=curl
+
+    ARCH="${ARCH:-$(uname -m)}"
+    
+
+    CNI=${CNI:-"cilium"}
+
+    NODE_TYPE="server"
+
+    CILIUM_HUBBLE=${CILIUM_HUBBLE:-false}
+
+    DOMAIN=${DOMAIN:-slyde_wip}
+    
+
+    if [ -z "${DISABLE_KUBE_PROXY}" ]; then
+        DISABLE_KUBE_PROXY=false
+    fi
+    
+
+    if [ "${REGISTRY_DOMAIN}" = "none" ]; then
+        REGISTRY_DOMAIN=""
+    else
+        REGISTRY_DOMAIN=${REGISTRY_DOMAIN:-${DOMAIN}}
+    fi
+    
+
+    REGISTRY_HOSTNAME=${REGISTRY_HOSTNAME:-registry}
+    
+
+    REGISTRY_PORT=${REGISTRY_PORT:-5000}
+    
+
+    if [ "${REGISTRY_URL}" = "none" ]; then
+        REGISTRY_URL=""
+    else
+        REGISTRY_URL=${REGISTRY_URL:-${REGISTRY_HOSTNAME}${REGISTRY_DOMAIN:+.${REGISTRY_DOMAIN}}:${REGISTRY_PORT}}
+    fi
+    
+
+    REGISTRY_IP=${REGISTRY_IP:-172.17.0.4}
+    
+
+    if [ -n "${REGISTRY_USERNAME}" ] && [ -z "${REGISTRY_PASSWORD}" ]; then
+        fatal "If the 'REGISTRY_USERNAME' is defined, you must define the 'REGISTRY_PASSWORD' too"
+    elif [ -z "${REGISTRY_USERNAME}" ] && [ -n "${REGISTRY_PASSWORD}" ]; then
+        fatal "If the 'REGISTRY_PASSWORD' is defined, you must define the 'REGISTRY_USERNAME' too"
+    fi
+
+    CONTROL_PLANE_ENDPOINT="192.168.1.100"   
+
+    CONTROL_PLANE_ENDPOINT_SAN=${CONTROL_PLANE_ENDPOINT_SAN:-""}
+    
+
+    SSO=${SSO:-false}
+    
+
+    REALM=${REALM}
+    
+
+    POD_NETWORK_CIDR=${POD_NETWORK_CIDR:-10.42.0.0/16}
+    
+
+    SERVICE_NETWORK_CIDR=${SERVICE_NETWORK_CIDR:-10.43.0.0/16}
+    
+
+    CLUSTER_DNS=${CLUSTER_DNS:-10.43.0.10}
+    
+
+    ENABLE_ADMISSION_PLUGIN=${ENABLE_ADMISSION_PLUGIN:-"NodeRestriction"}
+    
+
+    # something like: cis-1.5, cis-1.6
+    CIS_PROFILE=${CIS_PROFILE:-""}
+    
+    
+
+    AUDIT=${AUDIT:-false}
+    
+
+    KUBE_BOOTSTRAP_TOKEN=${KUBE_BOOTSTRAP_TOKEN:-server:518188a701a8cd5d123310c74b598d30}
+
+    MAIN_VAR_DIR=/etc/init/rancher/rke2
+    
+
+    MAIN_ETC_DIR=/etc/rancher/rke2
+
+    SHA256_ROOT_CACERT=$(openssl x509 -in ${MAIN_VAR_DIR}/server/tls/root-ca.crt -noout -sha256 -fingerprint | sed 's/://g'  | awk -F= '{print $2}' | awk '{print tolower($0)}')
+    
+
+    POD_MAX_PIDS="${POD_MAX_PIDS:-1000}"
+    
+
+    if [ -z "${NODE_IP}" ]; then
+        NODE_IP_TAG=
+    else
+        NODE_IP_TAG="node-ip: ${NODE_IP}"
+    fi
+    
+
+    case ${DISABLE_KUBE_PROXY} in
+    *true)
+        DISABLE_KUBE_PROXY_TAG="disable-kube-proxy: true"
+        ;;
+    esac
+    
+
+    if [ -n "$(list_vars_starting_with KUBELET_ARG_)" ]; then
+        KUBELET_ARGS_LIST=${KUBELET_ARGS_LIST:+${KUBELET_ARGS_LIST};}$(transform_vars_to_args "KUBELET_ARG_")
+    fi
+
+    if [ -n "$(list_vars_starting_with CONTROLLER_MANAGER_ARG_)" ]; then
+        CONTROLLER_MANAGER_ARGS_LIST=${CONTROLLER_MANAGER_ARGS_LIST:+${CONTROLLER_MANAGER_ARGS_LIST};}$(transform_vars_to_args "CONTROLLER_MANAGER_ARG_")
+    fi
+
+    if [ -n "$(list_vars_starting_with APISERVER_ARG_)" ]; then
+        APISERVER_ARGS_LIST=${APISERVER_ARGS_LIST:+${APISERVER_ARGS_LIST};}$(transform_vars_to_args "APISERVER_ARG_")
+    fi
+
+    if [ -n "$(list_vars_starting_with ETCD_ARG_)" ]; then
+        ETCD_ARGS_LIST=${ETCD_ARGS_LIST:+${ETCD_ARGS_LIST};}$(transform_vars_to_args "ETCD_ARG_")
+    fi
+
+    if [ -n "$(list_vars_starting_with SCHEDULER_ARG_)" ]; then
+        SCHEDULER_ARGS_LIST=${SCHEDULER_ARGS_LIST:+${SCHEDULER_ARGS_LIST};}$(transform_vars_to_args "SCHEDULER_ARG_")
+    fi
+
+    CONTROL_PLANE_RESOURCE_REQUESTS=${CONTROL_PLANE_RESOURCE_REQUESTS:-""}
+    
+
+    CONTROL_PLANE_RESOURCE_LIMITS=${CONTROL_PLANE_RESOURCE_LIMITS:-""}
+    
+
+    USE_SYSTEM_DEFAULT_REGISTRY=${USE_SYSTEM_DEFAULT_REGISTRY:-false}
+    
+
+
+    SYSTEM_DEFAULT_REGISTRY=""
+    
+}
+
+
+create_config_file_controller() {
+
+mkdir -p ${MAIN_ETC_DIR}
+sed -e '/.*TO_REMOVE.*/d' << EOF |  tee ${MAIN_ETC_DIR}/config.yaml > /dev/null
+
+token: K10${SHA256_ROOT_CACERT}::${KUBE_BOOTSTRAP_TOKEN}
+embedded-registry: true
+tls-san:
+  - ${CONTROL_PLANE_ENDPOINT}
+$(comma_lst_to_yaml_lst "$CONTROL_PLANE_ENDPOINT_SAN" 2)
+cni: ${CNI}
+profile: ${CIS_PROFILE}
+pod-security-admission-config-file: ${MAIN_ETC_DIR}/rke2-pss.yaml
+write-kubeconfig: ${MAIN_VAR_DIR}/rke2.yaml
+cluster-cidr: ${POD_NETWORK_CIDR}
+service-cidr: ${SERVICE_NETWORK_CIDR}
+cluster-dns: ${CLUSTER_DNS}
+$(printf "${API_SERVER_ADVERTISE_ADDRESS:+advertise-address: ${API_SERVER_ADVERTISE_ADDRESS}\n}")
+$(echo "$DISABLE_KUBE_PROXY_TAG")
+disable-cloud-controller: true
+$(if [ -n "${SYSTEM_DEFAULT_REGISTRY}" ] && [ "${USE_SYSTEM_DEFAULT_REGISTRY}" = true ]; then
+printf "system-default-registry: ${SYSTEM_DEFAULT_REGISTRY}"
+fi
+)
+disable:
+  - rke2-metrics-server
+  - rke2-ingress-nginx
+$(echo "$NODE_TAINT_TAG")
+kubelet-arg:
+  - "pod-max-pids=${POD_MAX_PIDS}"
+$(if [ -n "${NODE_IP}" ]; then
+printf "  - node-ip=${NODE_IP}\n"
+fi
+if [ -n "${KUBELET_ARGS_LIST}" ]; then
+comma_lst_to_yaml_lst "${KUBELET_ARGS_LIST}" 2 ";"
+fi
+)
+$(concat_lst "$KUBE_API_SERVER_ARG_TAG_AUDIT" "$KUBE_API_SERVER_ARG_TAG_SSO" "$KUBE_API_SERVER_ARG_TAG_ADMISSION_PLUGIN")
+$(if [ -n "${APISERVER_ARGS_LIST}" ]; then
+printf "kube-apiserver-arg:\n"
+comma_lst_to_yaml_lst "${APISERVER_ARGS_LIST}" 2 ";"
+else
+  echo TO_REMOVE
+fi
+)
+$( if [ -n "${ETCD_ARGS_LIST}" ]; then
+printf "etcd-arg:\n"
+comma_lst_to_yaml_lst "${ETCD_ARGS_LIST}" 2 ";"
+else
+  echo TO_REMOVE
+fi
+)
+$( if [ -n "${CONTROLLER_MANAGER_ARGS_LIST}" ]; then
+printf "kube-controller-manager-arg:\n"
+comma_lst_to_yaml_lst "${CONTROLLER_MANAGER_ARGS_LIST}" 2 ";"
+else
+  echo TO_REMOVE
+fi
+)
+$( if [ -n "${SCHEDULER_ARGS_LIST}" ]; then
+printf "kube-scheduler-arg:\n"
+comma_lst_to_yaml_lst "${SCHEDULER_ARGS_LIST}" 2 ";"
+else
+  echo TO_REMOVE
+fi
+)
+$(echo "$NODE_IP_TAG")
+$(if echo "${ENABLE_ADMISSION_PLUGIN}" | grep EventRateLimit > /dev/null; then
+printf "kube-apiserver-extra-mount:\n"
+echo "  - \"${MAIN_VAR_DIR}/server/cred/admission-control:${MAIN_VAR_DIR}/server/cred/admission-control:ro\""
+else
+  echo TO_REMOVE
+fi)
+$(case ${NODE_TYPE} in
+*server)
+    ;;
+*agent)
+    printf "server: https://${CONTROL_PLANE_ENDPOINT}:9345"
+    ;;
+esac)
+$(if [ -n "${CONTROL_PLANE_RESOURCE_REQUESTS}" ]; then
+printf "control-plane-resource-requests: ${CONTROL_PLANE_RESOURCE_REQUESTS}"
+fi)
+$(if [ -n "${CONTROL_PLANE_RESOURCE_LIMITS}" ]; then
+printf "control-plane-resource-limits: ${CONTROL_PLANE_RESOURCE_LIMITS}"
+fi)
+EOF
+
+
+chmod 600 ${MAIN_ETC_DIR}/config.yaml
+}
+
+
+setup_env
+create_config_file_controller

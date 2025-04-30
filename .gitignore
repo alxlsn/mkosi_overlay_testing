@@ -1,0 +1,7 @@
+mkosi.images/rke2_sysext/mkosi.extra/usr/local/bin/hauler
+mkosi.images/rke2_sysext/mkosi.extra/usr/local/bin/helm
+mkosi.images/rke2_sysext/mkosi.extra/usr/local/bin/helmfile
+mkosi.images/rke2_sysext/mkosi.extra/usr/local/bin/k9s
+build/mkosi.builddir/*
+build/mkosi.CacheDirectory/*
+build/mkosi.output/*

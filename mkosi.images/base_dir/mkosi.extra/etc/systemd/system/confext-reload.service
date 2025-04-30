@@ -1,0 +1,18 @@
+[Unit]
+Description=Reload systemd after confext merge
+After=systemd-confext.service
+Requires=systemd-confext.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/systemctl daemon-reload
+ExecStart=/bin/systemctl restart systemd-networkd
+ExecStart=/bin/systemctl restart keyboard-setup
+ExecStart=/bin/hostname -F /etc/hostname
+ExecStart=/bin/bash -c "/bin/systemctl list-units --all --type=service | grep loaded | grep rke2 | awk '{print $1}' | xargs -L1 /bin/systemctl restart &"
+
+
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

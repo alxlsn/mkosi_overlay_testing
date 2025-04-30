@@ -1,0 +1,16 @@
+---
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: rke2-coredns
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    extraVolumes:
+    - name: resolvconf
+      hostPath:
+        path: /etc/resolv.conf
+        type: File
+    extraVolumeMounts:
+    - name: resolvconf
+      mountPath: /etc/resolv.conf

@@ -1,0 +1,13 @@
+[Match]
+MACAddress=ec:2a:72:f5:63:c4
+
+[Network]
+KeepConfiguration=static
+Address=192.168.1.100/24
+Gateway=192.168.1.1
+DHCP=no
+IPv6AcceptRA=no
+
+[Route]
+Destination=192.168.1.100/24
+Gateway=0.0.0.0
